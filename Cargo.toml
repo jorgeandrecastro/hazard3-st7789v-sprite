@@ -1,23 +1,28 @@
 [package]
 edition       = "2024"
-name          = "embassy-st7789v-sprite"
+name          = "hazard3-st7789v-sprite"
 version       = "0.5.0"
 authors       = ["Jorge Andre Castro <georgeandrec@gmail.com>"]
-description   = "Moteur de sprites et d'animation style Piskel avec Framebuffer pour l'écran ST7789V via Embassy."
-documentation = "https://docs.rs/embassy-st7789v-sprite"
+description   = "no_std sprite and animation engine for ST7789V displays in the independent Hazard3 Async ecosystem."
+documentation = "https://docs.rs/hazard3-st7789v-sprite"
 readme        = "README.md"
-keywords      = ["embassy", "st7789v", "sprite", "animation", "no-std"]
+keywords      = ["hazard3", "st7789v", "sprite", "animation", "no-std"]
 categories    = ["embedded", "no-std", "hardware-support"]
 license       = "GPL-2.0-or-later"
-repository    = "https://github.com/jorgeandrecastro/embassy_st7789v_sprite"
+repository    = "https://github.com/jorgeandrecastro/hazard3-st7789v-sprite"
 
 [lib]
-name = "embassy_st7789v_sprite"
+name = "hazard3_st7789v_sprite"
 path = "src/lib.rs"
 
-[dependencies.embassy-st7789v]
-version = "0.6"
+[features]
+default = ["time-hazard3"]
+time-hazard3 = ["hazard3-st7789v/time-hazard3"]
+time-upstream = ["hazard3-st7789v/time-upstream"]
 
+[dependencies.hazard3-st7789v]
+version = "0.8"
+default-features = false
 
 [dependencies.embedded-hal]
 version = "1.0"

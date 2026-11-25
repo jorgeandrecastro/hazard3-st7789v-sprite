@@ -1,59 +1,78 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
-//! # embassy-st7789v-sprite
+//! # hazard3-st7789v-sprite
 //!
-//! Moteur de sprites et d'animation style Piskel avec Framebuffer RAM
-//! pour l'écran ST7789V 240×320 via Embassy.
+//! Piskel-style sprite and animation engine with a RAM framebuffer
+//! for the 240×320 ST7789V display, part of the independent
+//! [Hazard3 Async](https://github.com/jorgeandrecastro/hazard3-async).
+//! The default time backend is `hazard3-time`; for upstream Embassy,
+//! disable default features and enable `time-upstream`.
 //!
-//! ## Principe
+//! ```no_run
+//! use embedded_hal::digital::OutputPin;
+//! use embedded_hal_async::spi::SpiDevice;
+//! use hazard3_st7789v::St7789v;
+//! use hazard3_st7789v_sprite::{Color, SpriteEngine, FB_SIZE};
 //!
-//! Tout le dessin s'effectue dans un buffer RAM de 153 600 octets
-//! (`SCREEN_W` × `SCREEN_H` pixels codés en RGB565, soit 2 octets/pixel).
-//! Toutes les opérations de dessin ([`SpriteEngine::clear`], [`SpriteEngine::draw_sprite`],
+//! async fn draw<SPI: SpiDevice, DC: OutputPin, RST: OutputPin>(
+//!     display: &mut St7789v<SPI, DC, RST>,
+//!     framebuffer: &mut [u16; FB_SIZE],
+//! ) -> Result<(), SPI::Error> {
+//!     let mut engine = SpriteEngine::new(display, framebuffer);
+//!     engine.clear(Color::BLACK);
+//!     engine.flush().await
+//! }
+//! ```
+//!
+//! ## How it works
+//!
+//! All drawing takes place in a 153,600-byte RAM buffer
+//! (`SCREEN_W` × `SCREEN_H` pixels encoded as RGB565, or 2 bytes per pixel).
+//! All drawing operations ([`SpriteEngine::clear`], [`SpriteEngine::draw_sprite`],
 //! [`SpriteEngine::draw_pixel`], [`SpriteEngine::fill_rect`], [`SpriteEngine::draw_str`],
-//! [`SpriteEngine::draw_u32`], [`SpriteEngine::draw_f32`]) sont **synchrones** et
-//! ne font que modifier le framebuffer en RAM, sans aucune communication SPI.
-//! Un seul appel [`SpriteEngine::flush`] (asynchrone) envoie ensuite la frame
-//! complète vers l'écran physique via SPI/DMA.
+//! [`SpriteEngine::draw_u32`], [`SpriteEngine::draw_f32`]) are **synchronous**
+//! and only modify the framebuffer in RAM, without SPI communication.
+//! A single asynchronous [`SpriteEngine::flush`] call then sends the complete
+//! frame to the physical display over SPI/DMA.
 //!
-//! Ce découpage permet de composer une scène complète (fond, sprites, HUD…)
-//! sans scintillement, puis de l'envoyer d'un bloc une technique de
-//! double-bufferisation logicielle adaptée aux contraintes mémoire de l'embarqué.
+//! This separates composing a complete scene (background, sprites, HUD, etc.)
+//! in RAM from sending it as a block. It limits visible updates during
+//! composition, without guaranteeing tear-free display updates.
 //!
-//! ## Pourquoi une police locale plutôt que celle de `embassy-st7789v` ?
+//! ## Why use a local font instead of the one in `hazard3-st7789v`?
 //!
-//! `St7789v::draw_str` (dans `embassy-st7789v`) écrit **directement en SPI**,
-//! en dehors de tout framebuffer. Ce crate maintient son propre buffer
-//! `[u16; FB_SIZE]` composé en RAM puis envoyé d'un bloc via [`SpriteEngine::flush`] ;
-//! le texte doit donc être écrit dans *ce* buffer pour rester synchronisé avec
-//! les sprites, sinon on obtient un clignotement (texte et sprites envoyés par
-//! deux chemins SPI distincts). D'où une copie locale de la police 5×7.
+//! `St7789v::draw_str` (in `hazard3-st7789v`) writes **directly over SPI**,
+//! outside any framebuffer. This crate uses its own `[u16; FB_SIZE]` buffer,
+//! composed in RAM and sent as a block via [`SpriteEngine::flush`]. Text must
+//! therefore be written to *this* buffer to stay synchronized with sprites;
+//! otherwise, sending text and sprites over separate SPI paths causes flicker.
+//! This is why the crate has a local copy of the 5×7 font.
 
 use embedded_hal::digital::OutputPin;
 use embedded_hal_async::spi::SpiDevice;
 
-// Réexport de tout ce qui est utile pour l'utilisateur final.
-pub use embassy_st7789v::{
+// Re-export types and symbols useful to the end user.
+pub use hazard3_st7789v::{
     Color, NoPin, St7789v, St7789vBuffered,
     APPROX, DEGREE, DELTA, DIVIDE, GE, INFINITY, LAMBDA, LE, PI, PLUS_MINUS, SQRT, THETA, TIMES,
 };
 
-/// Largeur de l'écran ST7789V en pixels.
+/// ST7789V display width in pixels.
 pub const SCREEN_W: usize = 240;
 
-/// Hauteur de l'écran ST7789V en pixels.
+/// ST7789V display height in pixels.
 pub const SCREEN_H: usize = 320;
 
-/// Nombre total de pixels du framebuffer (SCREEN_W × SCREEN_H).
-pub const FB_SIZE: usize = SCREEN_W * SCREEN_H; // 76 800 pixels → 153 600 octets
+/// Total number of framebuffer pixels (SCREEN_W × SCREEN_H).
+pub const FB_SIZE: usize = SCREEN_W * SCREEN_H; // 76,800 pixels → 153,600 bytes
 
-/// Couleur-clé de transparence utilisée par [`SpriteEngine::draw_sprite`].
+/// Transparency color key used by [`SpriteEngine::draw_sprite`].
 pub const TRANSPARENT_KEY: u16 = 0xF81F;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Police bitmap 5×7:copie locale, indépendante de embassy-st7789v.
-// Mêmes glyphes/index que la police du pilote, pour rester cohérent visuellement.
+// 5×7 bitmap font: local copy, independent of hazard3-st7789v.
+// The same glyphs and indices as the driver's font keep the appearance consistent.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FONT: [[u8; 5]; 73] = [
@@ -182,21 +201,21 @@ fn char_to_glyph(c: u8) -> Option<usize> {
 // PiskelSprite
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Sprite statique ou planche d'animation exportée depuis Piskel.
+/// Static sprite or animation sheet exported from Piskel.
 ///
-/// Les données de pixels sont stockées en Flash (`&'static [u16]`).
-/// Chaque pixel est encodé en **RGB565** sur 16 bits.
-/// Le pixel [`TRANSPARENT_KEY`] est traité comme transparent par
+/// Pixel data is stored in flash (`&'static [u16]`).
+/// Each pixel is encoded as 16-bit **RGB565**.
+/// Pixels matching [`TRANSPARENT_KEY`] are treated as transparent by
 /// [`SpriteEngine::draw_sprite`].
 #[derive(Clone, Copy)]
 pub struct PiskelSprite {
-    /// Largeur d'une frame en pixels.
+    /// Width of one frame in pixels.
     pub width: u16,
-    /// Hauteur d'une frame en pixels.
+    /// Height of one frame in pixels.
     pub height: u16,
-    /// Nombre total de frames dans la planche.
+    /// Total number of frames in the sheet.
     pub frame_count: u16,
-    /// Données RGB565 de toutes les frames, en Flash.
+    /// RGB565 data for all frames, in flash.
     pub pixels: &'static [u16],
 }
 
@@ -204,7 +223,7 @@ pub struct PiskelSprite {
 // SpriteEngine
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Moteur de rendu par framebuffer pour le ST7789V.
+/// Framebuffer-based rendering engine for the ST7789V.
 pub struct SpriteEngine<'a, SPI, DC, RST = NoPin>
 where
     SPI: SpiDevice,
@@ -215,14 +234,14 @@ where
     framebuffer: &'a mut [u16; FB_SIZE],
 }
 
-// ── Constructeur sans broche RST ─────────────────────────────────────────────
+// ── Constructor without an RST pin ───────────────────────────────────────────
 
 impl<'a, SPI, DC> SpriteEngine<'a, SPI, DC, NoPin>
 where
     SPI: SpiDevice,
     DC: OutputPin,
 {
-    /// Crée un moteur pour un `St7789v` construit **sans** broche RST matérielle.
+    /// Creates an engine for a `St7789v` constructed **without** a hardware RST pin.
     #[inline]
     pub fn new_no_rst(
         display: &'a mut St7789v<SPI, DC, NoPin>,
@@ -232,7 +251,7 @@ where
     }
 }
 
-// ── Constructeur avec broche RST ─────────────────────────────────────────────
+// ── Constructor with an RST pin ──────────────────────────────────────────────
 
 impl<'a, SPI, DC, RST> SpriteEngine<'a, SPI, DC, RST>
 where
@@ -240,7 +259,7 @@ where
     DC: OutputPin,
     RST: OutputPin,
 {
-    /// Crée un moteur pour un `St7789v` avec broche RST matérielle.
+    /// Creates an engine for a `St7789v` with a hardware RST pin.
     #[inline]
     pub fn new(
         display: &'a mut St7789v<SPI, DC, RST>,
@@ -249,15 +268,15 @@ where
         Self { display, framebuffer }
     }
 
-    // ── Opérations sur le framebuffer (synchrones, RAM uniquement) ────────────
+    // ── Framebuffer operations (synchronous, RAM only) ────────────────────────
 
-    /// Remplit **tout** le framebuffer RAM avec `color` (aucune communication SPI).
+    /// Fills the **entire** RAM framebuffer with `color` (no SPI communication).
     #[inline]
     pub fn clear(&mut self, color: Color) {
         self.framebuffer.fill(color.0);
     }
 
-    /// Dessine la frame `frame` d'un [`PiskelSprite`] dans le framebuffer RAM.
+    /// Draws frame `frame` of a [`PiskelSprite`] into the RAM framebuffer.
     pub fn draw_sprite(
         &mut self,
         sprite: &PiskelSprite,
@@ -300,7 +319,7 @@ where
         }
     }
 
-    /// Dessine un pixel isolé directement dans le framebuffer RAM.
+    /// Draws a single pixel directly into the RAM framebuffer.
     #[inline]
     pub fn draw_pixel(&mut self, x: i16, y: i16, color: Color) {
         if x >= 0 && y >= 0 && (x as usize) < SCREEN_W && (y as usize) < SCREEN_H {
@@ -308,7 +327,7 @@ where
         }
     }
 
-    /// Remplit un rectangle dans le framebuffer RAM.
+    /// Fills a rectangle in the RAM framebuffer.
     pub fn fill_rect(&mut self, x0: i16, y0: i16, x1: i16, y1: i16, color: Color) {
         let raw = color.0;
         let xa = x0.max(0) as usize;
@@ -326,22 +345,22 @@ where
         }
     }
 
-    // ── Texte (synchrone, RAM uniquement — même buffer que le reste) ──────────
+    // ── Text (synchronous, RAM only — same buffer as other drawing) ──────────
 
-    /// Dessine un glyphe 5×7 dans le framebuffer RAM (aucune communication SPI).
-    /// Retourne la coordonnée x après le glyphe.
+    /// Draws a 5×7 glyph into the RAM framebuffer (no SPI communication).
+    /// Returns the x coordinate after the glyph.
     pub fn draw_char(&mut self, x: i16, y: i16, glyph_idx: usize, fg: Color, bg: Color) -> i16 {
         for row in 0..7i16 {
             for col in 0..5i16 {
-                let allume = (FONT[glyph_idx][col as usize] >> row) & 1 == 1;
-                self.draw_pixel(x + col, y + row, if allume { fg } else { bg });
+                let lit = (FONT[glyph_idx][col as usize] >> row) & 1 == 1;
+                self.draw_pixel(x + col, y + row, if lit { fg } else { bg });
             }
         }
         x + 6
     }
 
-    /// Affiche une chaîne ASCII (+ symboles étendus 0x80-0x8C) dans le framebuffer RAM.
-    /// Retourne la coordonnée x après le dernier caractère.
+    /// Draws an ASCII string (+ extended symbols 0x80-0x8C) into the RAM framebuffer.
+    /// Returns the x coordinate after the last character.
     pub fn draw_str(&mut self, mut x: i16, y: i16, text: &[u8], fg: Color, bg: Color) -> i16 {
         for &c in text {
             if x + 5 >= SCREEN_W as i16 { break; }
@@ -354,61 +373,61 @@ where
         x
     }
 
-    /// Affiche un entier non signé 32 bits dans le framebuffer RAM.
+    /// Draws a 32-bit unsigned integer into the RAM framebuffer.
     pub fn draw_u32(&mut self, mut x: i16, y: i16, val: u32, fg: Color, bg: Color) -> i16 {
         let mut n = val;
-        let mut chiffres = [0u8; 10];
-        let mut compte = 0usize;
+        let mut digits = [0u8; 10];
+        let mut count = 0usize;
         loop {
-            chiffres[compte] = (n % 10) as u8;
+            digits[count] = (n % 10) as u8;
             n /= 10;
-            compte += 1;
+            count += 1;
             if n == 0 { break; }
         }
-        for i in (0..compte).rev() {
-            x = self.draw_char(x, y, chiffres[i] as usize, fg, bg);
+        for i in (0..count).rev() {
+            x = self.draw_char(x, y, digits[i] as usize, fg, bg);
         }
         x
     }
 
-    /// Affiche un `f32` dans le framebuffer RAM, `decimales` chiffres après la virgule.
-    /// Gère NaN et +/-Inf.
-    pub fn draw_f32(&mut self, mut x: i16, y: i16, val: f32, decimales: u8, fg: Color, bg: Color) -> i16 {
+    /// Draws an `f32` into the RAM framebuffer with `decimals` digits after the decimal point.
+    /// Handles NaN and +/-Inf.
+    pub fn draw_f32(&mut self, mut x: i16, y: i16, val: f32, decimals: u8, fg: Color, bg: Color) -> i16 {
         if val.is_nan() { return self.draw_str(x, y, b"NaN", fg, bg); }
         if val.is_infinite() {
             return self.draw_str(x, y, if val > 0.0 { b"+Inf" } else { b"-Inf" }, fg, bg);
         }
-        let negatif = val < 0.0;
-        let mut abs = if negatif { -val } else { val };
-        if negatif { x = self.draw_char(x, y, 10, fg, bg); } // '-'
+        let negative = val < 0.0;
+        let mut abs = if negative { -val } else { val };
+        if negative { x = self.draw_char(x, y, 10, fg, bg); } // '-'
 
-        let facteur = { let mut f = 1u32; for _ in 0..decimales { f *= 10; } f };
-        abs += 0.5 / facteur as f32;
+        let factor = { let mut f = 1u32; for _ in 0..decimals { f *= 10; } f };
+        abs += 0.5 / factor as f32;
 
-        let entier = abs as u32;
-        x = self.draw_u32(x, y, entier, fg, bg);
+        let integer = abs as u32;
+        x = self.draw_u32(x, y, integer, fg, bg);
 
-        if decimales > 0 {
+        if decimals > 0 {
             x = self.draw_char(x, y, 38, fg, bg); // '.'
-            let mut frac = abs - entier as f32;
-            let mut chiffres = [0u8; 8];
-            for i in 0..decimales as usize {
+            let mut frac = abs - integer as f32;
+            let mut digits = [0u8; 8];
+            for i in 0..decimals as usize {
                 frac *= 10.0;
                 let d = frac as u8;
-                chiffres[i] = d;
+                digits[i] = d;
                 frac -= d as f32;
             }
-            for i in 0..decimales as usize {
-                x = self.draw_char(x, y, chiffres[i] as usize, fg, bg);
+            for i in 0..decimals as usize {
+                x = self.draw_char(x, y, digits[i] as usize, fg, bg);
             }
         }
         x
     }
 
-    // ── Envoi vers l'écran (asynchrone, SPI) ─────────────────────────────────
+    // ── Sending to the display (asynchronous, SPI) ────────────────────────────
 
-    /// Envoie le contenu complet du framebuffer RAM vers l'écran physique
-    /// en un seul flux SPI continu (fenêtre ouverte une fois, pas par pixel).
+    /// Sends the entire RAM framebuffer to the physical display in a single
+    /// continuous SPI stream (opening the window once, not once per pixel).
     pub async fn flush(&mut self) -> Result<(), SPI::Error> {
         self.display
             .blit_u16(0, 0, (SCREEN_W - 1) as u16, (SCREEN_H - 1) as u16, self.framebuffer)

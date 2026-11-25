@@ -1,49 +1,61 @@
 # Changelog
 
+## 0.5.0
+
+### Hazard3 migration
+- Renamed `embassy-st7789v-sprite` to `hazard3-st7789v-sprite`;
+  the Rust import is now `hazard3_st7789v_sprite`.
+- Replaced the driver with `hazard3-st7789v` 0.8. Re-exported types now
+  come from this driver and are not interchangeable with those from the
+  old `embassy-st7789v` package.
+- `time-hazard3` is enabled by default; `time-upstream` allows using
+  upstream Embassy when default features are disabled. Exactly one time
+  backend must be selected.
+- The legacy `embassy-st7789v-sprite` package was yanked from new crates.io
+  resolutions without deleting existing releases.
+
 ## 0.4.0
 
-### Ajouté
-- Nouvelles méthodes sur `SpriteEngine` : `draw_char`, `draw_str`,
-  `draw_u32`, `draw_f32`: écrivent directement dans le framebuffer RAM
-  du moteur, au même titre que `draw_sprite`/`draw_pixel`/`fill_rect`.
-- Police bitmap 5×7 (73 glyphes, ASCII + symboles grecs/mathématiques)
-  dupliquée localement dans ce crate, indépendante de celle de
-  `embassy-st7789v` : aucune modification requise côté `embassy-st7789v`.
+### Added
+- New `SpriteEngine` methods: `draw_char`, `draw_str`, `draw_u32`, and
+  `draw_f32` write directly to the engine's RAM framebuffer, just like
+  `draw_sprite`/`draw_pixel`/`fill_rect`.
+- A 5×7 bitmap font (73 glyphs, ASCII + Greek/mathematical symbols)
+  duplicated locally in this crate, independently of `embassy-st7789v`:
+  no changes are required in `embassy-st7789v`.
 
-### Corrigé
-- Clignotement du texte : auparavant, le texte devait être dessiné via
-  `St7789v::draw_str`/`draw_u32`/`draw_f32` (écriture SPI directe, hors
-  framebuffer), ce qui provoquait une désynchronisation visible entre le
-  texte et le reste de la scène à chaque frame. Le texte suit désormais
-  le même chemin que les sprites : composé en RAM, envoyé en un seul
-  `flush()`.
+### Fixed
+- Text flicker: previously, text had to be drawn using
+  `St7789v::draw_str`/`draw_u32`/`draw_f32` (direct SPI writes outside the
+  framebuffer), causing visible desynchronization between text and the
+  rest of the scene on each frame. Text now follows the same path as
+  sprites: composed in RAM and sent in a single `flush()`.
 
-### Modifié
-- `embassy-st7789v` reste en `"0.6"` (aucun changement requis dans cette
-  crate pour cette version  l'ajout de texte est entièrement local à
+### Changed
+- `embassy-st7789v` remains at `"0.6"` (no changes to that crate were
+  required for this release; text rendering was added entirely within
   `embassy-st7789v-sprite`).
 
 ## 0.3.0
 
-### Modifié
-- Mise à jour de la dépendance `embassy-st7789v` vers `0.6`.
-- `SpriteEngine::flush()` utilise désormais `St7789v::blit_u16` pour
-  envoyer le framebuffer entier en un seul transfert SPI continu
-  (fenêtre ouverte une fois), ce qui permet des transferts plus
-  efficaces via DMA si le pilote le supporte.
+### Changed
+- Updated the `embassy-st7789v` dependency to `0.6`.
+- `SpriteEngine::flush()` now uses `St7789v::blit_u16` to send the entire
+  framebuffer in a single continuous SPI transfer (opening the window
+  once), enabling more efficient DMA transfers if supported by the driver.
 
-### Ajouté
-- Documentation dans `README.md` expliquant le nouveau comportement
-  de `flush()` et exemple d'implémentation.
+### Added
+- Documentation in `README.md` explaining the new `flush()` behavior
+  and an implementation example.
 
 ## 0.2.0
 
-### Ajouté
-- Réexport des symboles grecs et mathématiques de `embassy-st7789v`
+### Added
+- Re-exported Greek and mathematical symbols from `embassy-st7789v`
   (`LAMBDA`, `THETA`, `PI`, `DELTA`, `DEGREE`, `PLUS_MINUS`, `TIMES`,
-  `DIVIDE`, `SQRT`, `INFINITY`, `APPROX`, `LE`, `GE`) pour l'affichage
-  de texte scientifique via `draw_str` / `draw_str_buf`.
+  `DIVIDE`, `SQRT`, `INFINITY`, `APPROX`, `LE`, `GE`) for scientific
+  text rendering via `draw_str` / `draw_str_buf`.
 
 ## 0.1.0
-- Version initiale : `SpriteEngine`, `PiskelSprite`, framebuffer RAM,
-  transparence, clipping automatique.
+- Initial release: `SpriteEngine`, `PiskelSprite`, RAM framebuffer,
+  transparency, and automatic clipping.

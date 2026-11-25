@@ -24,26 +24,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embassy-st7789v"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6a687b69bce3b7a9595476f93a012805fc7d740088ead0e988b15dfcad68f7b"
-dependencies = [
- "embassy-time",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
-]
-
-[[package]]
-name = "embassy-st7789v-sprite"
-version = "0.5.0"
-dependencies = [
- "embassy-st7789v",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
-]
-
-[[package]]
 name = "embassy-time"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -98,6 +78,51 @@ name = "futures-core"
 version = "0.3.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cd50c473c80f6d7c3670a752354b8e569b1a7cbfdc0419ec88e5edad85e0dc7"
+
+[[package]]
+name = "hazard3-st7789v"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aa6490c8ce65636c2f54039bb6c2856efc9d39aed546fcc2d646a82ccf580b"
+dependencies = [
+ "embassy-time",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "hazard3-time",
+]
+
+[[package]]
+name = "hazard3-st7789v-sprite"
+version = "0.5.0"
+dependencies = [
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "hazard3-st7789v",
+]
+
+[[package]]
+name = "hazard3-time"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1b9953f9fca3f4974d69255a7d09a816d78e86ea315722770f98329215be5d2"
+dependencies = [
+ "critical-section",
+ "document-features",
+ "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "futures-core",
+ "hazard3-time-driver",
+]
+
+[[package]]
+name = "hazard3-time-driver"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6adf1541b4792a714a061d117448840e739e2ec1a35f785cdd43cdc2746a58d1"
+dependencies = [
+ "document-features",
+]
 
 [[package]]
 name = "litrs"
