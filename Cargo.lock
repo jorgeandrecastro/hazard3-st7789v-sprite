@@ -81,9 +81,9 @@ checksum = "2cd50c473c80f6d7c3670a752354b8e569b1a7cbfdc0419ec88e5edad85e0dc7"
 
 [[package]]
 name = "hazard3-st7789v"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aa6490c8ce65636c2f54039bb6c2856efc9d39aed546fcc2d646a82ccf580b"
+checksum = "87ad2a01ded7fcd13e63b206984ccd650c18559420b6094cac7a348e6b9a6603"
 dependencies = [
  "embassy-time",
  "embedded-hal 1.0.0",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "hazard3-st7789v-sprite"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "embedded-hal 1.0.0",
  "embedded-hal-async",

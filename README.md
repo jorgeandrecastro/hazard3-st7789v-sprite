@@ -9,8 +9,8 @@ backend is also available as an option.
 
 [![Crates.io](https://img.shields.io/crates/v/hazard3-st7789v-sprite.svg)](https://crates.io/crates/hazard3-st7789v-sprite)
 [![Docs.rs](https://docs.rs/hazard3-st7789v-sprite/badge.svg)](https://docs.rs/hazard3-st7789v-sprite)
-[![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
-![no_std](https://img.shields.io/badge/no__std-yes-brightgreen)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20or%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
+
 
 ---
 
@@ -71,8 +71,8 @@ your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hazard3-st7789v-sprite = "0.5"
-hazard3-st7789v        = "0.8"
+hazard3-st7789v-sprite = "0.6"
+hazard3-st7789v        = "0.9"
 embedded-hal           = "1.0"
 embedded-hal-async     = "1.0"
 ```
@@ -88,8 +88,8 @@ To use upstream Embassy instead, disable default features and select
 
 ```toml
 [dependencies]
-hazard3-st7789v-sprite = { version = "0.5", default-features = false, features = ["time-upstream"] }
-hazard3-st7789v = { version = "0.8", default-features = false, features = ["time-upstream"] }
+hazard3-st7789v-sprite = { version = "0.6", default-features = false, features = ["time-upstream"] }
+hazard3-st7789v = { version = "0.9", default-features = false, features = ["time-upstream"] }
 ```
 
 This configuration requires an upstream Embassy time driver and runtime.
@@ -408,8 +408,17 @@ static COIN_SPRITE: PiskelSprite = PiskelSprite {
 - All drawing operations run in `O(affected pixels)` and perform no
   allocation (`#![no_std]`, no `alloc` dependency).
 
-## License
 
-Distributed under **GPL-2.0-or-later**. See the [GPL 2.0 text](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
+## 🛡️ License
 
-## Copyright (C) 2026 Jorge Andre Castro
+Licensed under either of:
+
+    MIT license (http://opensource.org/licenses/MIT)
+
+    Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
+at your option.
+
+## 🦅 About
+
+Developed by Jorge Andre Castro.
